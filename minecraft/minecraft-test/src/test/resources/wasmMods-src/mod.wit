@@ -1,0 +1,25 @@
+package fabric:mod@0.1.0;
+
+interface types {
+  enum value-kind {
+    none, bool-val, i8-val, char-val, i16-val, i32-val, i64-val, f32-val, f64-val, object-val
+  }
+  record value { kind: value-kind, bits: u64 }
+  variant outcome {
+    proceed,
+    cancel,
+    return-value(value),
+    replace(value),
+    supply(value),
+    passthrough,
+    skip,
+    failed(string),
+  }
+}
+
+world mod {
+  use types.{value, outcome};
+  export abi-version: func() -> u32;
+  export init: func();
+  export on-hook: func(hook: u32, args: list<value>) -> outcome;
+}

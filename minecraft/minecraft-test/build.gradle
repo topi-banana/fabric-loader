@@ -44,6 +44,11 @@ dependencies {
 
 test {
 	useJUnitPlatform()
+
+	// point the loader at the committed wasm mod so that WasmModTest can exercise the whole path
+	// under Knot; jar mods still come from the class path in a development environment, so nothing
+	// else is affected by overriding this
+	systemProperty "fabric.modsFolder", file("src/test/resources/wasmMods").absolutePath
 }
 
 java {
