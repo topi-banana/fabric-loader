@@ -48,6 +48,10 @@ enum LoaderLibrary {
 	ASM_UTIL(CheckClassAdapter.class),
 	SAT4J_CORE(ContradictionException.class),
 	SAT4J_PB(SolverFactory.class),
+	// referenced by resource name, not by class: chicory's class files target a newer Java version
+	// than the loader, so touching them while classifying libraries would break old game versions
+	CHICORY_RUNTIME("com/dylibso/chicory/runtime/Instance.class", null),
+	CHICORY_WASM("com/dylibso/chicory/wasm/WasmModule.class", null),
 	SERVER_LAUNCH("fabric-server-launch.properties", EnvType.SERVER), // installer generated jar to run setup loader's class path
 	SERVER_LAUNCHER("net/fabricmc/installer/ServerLauncher.class", EnvType.SERVER), // installer based launch-through method
 	JUNIT_API("org/junit/jupiter/api/Test.class", null),

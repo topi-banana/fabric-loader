@@ -115,6 +115,10 @@ dependencies {
 	include "net.fabricmc:tiny-remapper:0.14.0"
 	include "net.fabricmc:class-tweaker:0.3.0-beta.2"
 	include "net.fabricmc:mapping-io:0.7.1"
+	// WebAssembly engine for wasm component mods. Pure Java, no native dependencies.
+	// The include configuration is not transitive; runtime -> wasm is chicory's entire closure.
+	include "com.dylibso.chicory:runtime:${project.chicory_version}"
+	include "com.dylibso.chicory:wasm:${project.chicory_version}"
 
 	development "io.github.llamalad7:mixinextras-fabric:$mixin_extras_version"
 
@@ -206,12 +210,17 @@ tasks.register('fatJar', ShadowJar) {
 	relocate 'net.fabricmc.classtweaker', 'net.fabricmc.loader.impl.lib.classtweaker'
 	relocate 'net.fabricmc.tinyremapper', 'net.fabricmc.loader.impl.lib.tinyremapper'
 	relocate 'net.fabricmc.mappingio', 'net.fabricmc.loader.impl.lib.mappingio'
+	relocate 'com.dylibso.chicory', 'net.fabricmc.loader.impl.lib.chicory'
 
 	exclude 'about.html'
 	exclude 'sat4j.version'
 	exclude 'META-INF/maven/org.ow2.sat4j/*/**'
+	exclude 'META-INF/maven/com.dylibso.chicory/*/**'
 	exclude 'META-INF/*.RSA'
 	exclude 'META-INF/*.SF'
+	// chicory ships a module descriptor in each jar; a relocated one at the fat jar root would
+	// describe packages that no longer exist, and proguard cannot process it either
+	exclude 'module-info.class'
 
 	inputs.files(project.configurations.development)
 	def devFiles = project.configurations.development.files
