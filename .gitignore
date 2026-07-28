@@ -24,5 +24,8 @@
 !/minecraft
 !/junit
 
+# Loader cache, created wherever the game (or a test running it) is launched from
+.fabric/
+
 # MacOS junk files
 .DS_Store

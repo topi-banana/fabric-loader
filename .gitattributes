@@ -19,6 +19,8 @@
 *.sh            text
 *.tld           text
 *.txt           text
+*.wat           text
+*.wit           text
 *.xml           text
 
 # These files are binary and should be left untouched
@@ -34,3 +36,4 @@
 *.png           binary
 *.so            binary
 *.war           binary
+*.wasm          binary
