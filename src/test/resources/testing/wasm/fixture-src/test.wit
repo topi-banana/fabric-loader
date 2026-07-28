@@ -1,0 +1,6 @@
+package fabric:test@0.1.0;
+
+world mod {
+  export init: func();
+  export on-hook: func(hook: u32) -> u32;
+}
