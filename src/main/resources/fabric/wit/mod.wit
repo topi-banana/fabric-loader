@@ -1,0 +1,113 @@
+// The interface a WebAssembly component must implement to be loadable as a Fabric mod.
+//
+// This file is the source of truth for mod authors: run it through wit-bindgen (or your language's
+// component tooling) to get typed bindings. The loader does not parse it -- the handful of types
+// below are hand encoded on the host side -- so it and the host must be changed together, which is
+// what the abi-version handshake exists to catch.
+//
+// Values crossing the boundary are deliberately confined to one fixed size, pointer free record.
+// That makes list<value> a plain array with a constant stride instead of a list of variants, which
+// is by far the most expensive thing the Canonical ABI can ask of an implementation.
+
+package fabric:mod@0.1.0;
+
+interface types {
+    /// An opaque, non-owning reference to a Java object. 0 always means Java null.
+    ///
+    /// Deliberately not a `resource`: handles are valid only for the duration of the hook that
+    /// produced them, and the host releases them all when the hook returns. Caching one and using
+    /// it later is an error the host detects and reports rather than a use-after-free.
+    type handle = u32;
+
+    /// Which Java type a `value` holds.
+    enum value-kind {
+        none,
+        bool,
+        i8,
+        u16-char,
+        i16,
+        i32,
+        i64,
+        f32,
+        f64,
+        object,
+    }
+
+    /// One value crossing the boundary. Alignment 8, size 16: kind at offset 0, bits at offset 8.
+    ///
+    /// `bits` is interpreted according to `kind`:
+    ///   bool      0 or 1
+    ///   i8/i16/i32/i64  sign extended
+    ///   u16-char  zero extended
+    ///   f32       the raw float bits, zero extended; the upper 32 bits are always 0
+    ///   f64       the raw double bits
+    ///   object    a handle, zero extended
+    ///   none      0
+    record value {
+        kind: value-kind,
+        bits: u64,
+    }
+
+    /// What the host should do once a hook returns.
+    ///
+    /// Which cases are meaningful depends on the hook's kind, as declared in fabric.mod.json:
+    ///   inject          proceed, cancel, return-value, skip, failed
+    ///   modify-variable replace, skip, failed
+    ///   modify-arg      replace, skip, failed
+    ///   redirect        supply, passthrough, skip, failed
+    variant outcome {
+        /// Carry on with the target method unchanged.
+        proceed,
+        /// Stop the target method. Only honoured by a hook declared `cancellable`.
+        cancel,
+        /// Stop the target method and return this value instead.
+        return-value(value),
+        /// Use this value in place of the one the hook was given.
+        replace(value),
+        /// Use this value as the result of the call a redirect hook intercepted.
+        supply(value),
+        /// Perform the intercepted call as it was originally written.
+        passthrough,
+        /// Do nothing; equivalent to proceed or passthrough depending on the hook's kind.
+        skip,
+        /// Something went wrong inside the guest. The host logs the message and disables the mod.
+        failed(string),
+    }
+}
+
+/// Writing to the game's log.
+interface log {
+    enum level {
+        error,
+        warn,
+        info,
+        debug,
+        trace,
+    }
+
+    write: func(lvl: level, message: string);
+}
+
+world mod {
+    import log;
+
+    use types.{value, outcome};
+
+    /// Must return 1. Called before init, so that a guest built against a different revision of
+    /// this file is rejected up front rather than silently receiving mismatched arguments.
+    export abi-version: func() -> u32;
+
+    /// Called once, after instantiation and before any hook can fire.
+    export init: func();
+
+    /// Every hook the mod declares arrives here.
+    ///
+    /// `hook` is the index of the declaration in custom["fabric:wasm"].hooks of fabric.mod.json.
+    ///
+    /// `args` is, in order: the receiver as an object value when the injected method is an instance
+    /// method and nothing when it is static, followed by the values the injector hands the handler.
+    /// For an inject hook those are the target method's parameters; for modify-variable and
+    /// modify-arg it is the single value being modified; for redirect it is the receiver of the
+    /// intercepted call followed by its arguments.
+    export on-hook: func(hook: u32, args: list<value>) -> outcome;
+}
