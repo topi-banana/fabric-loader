@@ -16,6 +16,7 @@
 
 package net.fabricmc.loader.impl.discovery;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -66,6 +67,12 @@ import net.fabricmc.loader.impl.util.LoaderUtil;
 import net.fabricmc.loader.impl.util.SystemProperties;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
+import net.fabricmc.loader.impl.wasm.WasmConstants;
+import net.fabricmc.loader.impl.wasm.WasmSupport;
+import net.fabricmc.loader.impl.wasm.component.ComponentDecoder;
+import net.fabricmc.loader.impl.wasm.component.WasmParseException;
+import net.fabricmc.loader.impl.wasm.meta.WasmMetadataException;
+import net.fabricmc.loader.impl.wasm.meta.WasmModSpec;
 
 public final class ModDiscoverer {
 	private final VersionOverrides versionOverrides;
@@ -286,6 +293,8 @@ public final class ModDiscoverer {
 
 						if (Files.isDirectory(path)) {
 							candidate = computeDir(path);
+						} else if (WasmSupport.isWasmPath(path)) {
+							candidate = computeWasmFile(path);
 						} else {
 							candidate = computeJarFile(path);
 						}
@@ -315,6 +324,43 @@ public final class ModDiscoverer {
 			}
 
 			return ModCandidateImpl.createPlain(paths, metadata, requiresRemap, Collections.emptyList());
+		}
+
+		/**
+		 * Reads a WebAssembly mod, whose {@code fabric.mod.json} lives in a custom section of the
+		 * component rather than in an archive entry.
+		 *
+		 * <p>Only the metadata is decoded here. Extracting the core module and generating the Mixin
+		 * glue happens later, in {@code WasmModProcessor}, so that discovery stays cheap for files
+		 * that turn out not to be mods.
+		 */
+		private ModCandidateImpl computeWasmFile(Path path) throws IOException, ParseMetadataException,
+				WasmParseException, WasmMetadataException {
+			byte[] json = ComponentDecoder.findMetadata(Files.readAllBytes(path));
+
+			if (json == null) {
+				nonFabricMods.add(path);
+				return null;
+			}
+
+			LoaderModMetadata metadata;
+
+			try (InputStream is = new ByteArrayInputStream(json)) {
+				metadata = parseMetadata(is, localPath);
+			}
+
+			WasmModSpec spec = WasmModSpec.parse(metadata.getCustomValue(WasmConstants.CUSTOM_KEY), metadata.getId());
+
+			if (!metadata.getMixinConfigs(EnvType.CLIENT).isEmpty() || !metadata.getMixinConfigs(EnvType.SERVER).isEmpty()) {
+				throw new WasmMetadataException(String.format(
+						"mod '%s' declares 'mixins', but a .wasm contains no Mixin classes; declare the injections "
+						+ "under custom[\"%s\"].hooks instead", metadata.getId(), WasmConstants.CUSTOM_KEY));
+			}
+
+			// requiresRemap is always false: a .wasm cannot go through tiny-remapper, and the
+			// generator resolves every declared name to the runtime namespace itself
+			return ModCandidateImpl.createPlain(paths, new WasmModMetadata(metadata, !spec.getHooks().isEmpty()),
+					false, Collections.emptyList());
 		}
 
 		private ModCandidateImpl computeJarFile(Path path) throws IOException, ParseMetadataException {

@@ -54,6 +54,7 @@ import net.fabricmc.loader.impl.discovery.ModDiscoverer;
 import net.fabricmc.loader.impl.discovery.ModResolutionException;
 import net.fabricmc.loader.impl.discovery.ModResolver;
 import net.fabricmc.loader.impl.discovery.RuntimeModRemapper;
+import net.fabricmc.loader.impl.discovery.WasmModCandidateFinder;
 import net.fabricmc.loader.impl.entrypoint.EntrypointStorage;
 import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
@@ -69,6 +70,8 @@ import net.fabricmc.loader.impl.util.LoaderUtil;
 import net.fabricmc.loader.impl.util.SystemProperties;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
+import net.fabricmc.loader.impl.wasm.WasmConstants;
+import net.fabricmc.loader.impl.wasm.WasmModProcessor;
 
 @SuppressWarnings("deprecation")
 public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
@@ -216,6 +219,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		ModDiscoverer discoverer = new ModDiscoverer(versionOverrides, depOverrides);
 		discoverer.addCandidateFinder(new ClasspathModCandidateFinder());
 		discoverer.addCandidateFinder(new DirectoryModCandidateFinder(getModsDirectory0(), remapRegularMods));
+		discoverer.addCandidateFinder(new WasmModCandidateFinder(getModsDirectory0()));
 		discoverer.addCandidateFinder(new ArgumentModCandidateFinder(remapRegularMods));
 
 		Map<String, Set<ModCandidateImpl>> envDisabledMods = new HashMap<>();
@@ -276,6 +280,11 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 				}
 			}
 		}
+
+		// generate the glue for wasm mods; has to happen before addMod, because ModContainerImpl
+		// captures the candidate's paths and the generated directory is what has to be on the class path
+
+		WasmModProcessor.process(modCandidates, cacheDir.resolve(WasmConstants.CACHE_DIR_NAME));
 
 		// add mods
 
