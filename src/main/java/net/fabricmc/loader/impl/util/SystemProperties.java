@@ -90,6 +90,10 @@ public final class SystemProperties {
 	public static final String UNIT_TEST = "fabric.unitTest";
 	// whether to disable the swing gui popup when error occurred
 	public static final String NO_GUI = "fabric.noGui";
+	// ignore .wasm files in the mods folder entirely
+	public static final String WASM_DISABLED = "fabric.wasm.disabled";
+	// regenerate the glue for wasm mods even if the cache is up to date
+	public static final String DEBUG_WASM_FORCE_REGEN = "fabric.debug.wasmForceRegen";
 
 	public static boolean isSet(String property) {
 		String val = System.getProperty(property);
